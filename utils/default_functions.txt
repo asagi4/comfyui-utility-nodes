@@ -1,0 +1,38 @@
+def $descseq($expr; $var; $sw; $ew; $start; $step) {
+  [SEQ<%- for step in steps(0, $sw - $ew, $step) -%>
+  <%- set $var = round($sw - step, 2) -%>
+  <%- if $var >= $ew -%>
+  :$expr:<= round($start + step, 2) =>
+  <%- endif -%>
+  <%- endfor -%>
+  <%- set $var = $ew -%>:$expr:1]
+}
+
+def $ascseq($expr; $var; $sw; $ew; $start; $step) {
+  [SEQ<%- for step in steps(0, round($ew - $sw, 2), $step) -%>
+  <%- set $var = round($sw+step, 2) -%>
+  <%- if $var < $ew -%>
+  :$expr:<= round($start + step, 2) =>
+  <%- endif -%>
+  <%- endfor -%>
+  <%- set $var = $ew -%>:$expr:1]
+}
+
+def $warmlora($lora; $e; $start; $step) {
+    var $x = <lora:$lora:<= x + $start =>>; $y = $eval($e - $start)
+	$ascseq($x; x; 0; $y; $step; $step)
+}
+
+def $coollora($lora; $start; $step) {
+    var $x = <lora:$lora:<= x =>>
+	$descseq($x; x; $start; 0; 0; $step)
+}
+
+def $rectmask($x; $y; $size) {
+	MASK($x <= $x + $size =>, $y <= $y + $size =>)
+}
+
+# Evaluates expression as Jinja2 immediately
+defj $eval($x) {
+  <= $x =>
+}
