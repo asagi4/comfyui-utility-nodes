@@ -3,10 +3,8 @@ from os import environ
 import random
 import re
 from pathlib import Path
-from collections import ChainMap
 
-from .jinja_render import render_jinja
-from .parse import parse, pparse
+from .parse import parse
 
 # from .parse import parse
 
@@ -36,6 +34,13 @@ def handle_wildcard_node(json_data, node_id):
     return json_data
 
 
+def read_preamble():
+    curfile = Path(__file__)
+    defaults = curfile.parent / "default_functions.txt"
+    with open(defaults, "r") as f:
+        return parse(f.read())[1]
+
+
 def find_and_remove(regexp, text, placeholder=""):
     m = regexp.search(text)
     res = {}
@@ -53,159 +58,6 @@ def find_and_remove(regexp, text, placeholder=""):
         text = text[:s] + ph + text[e:]
         m = regexp.search(text)
     return res, text
-
-
-def function_definitions(text):
-    # $foo($a, $b...) { bodygoeshere \} }
-    func_re = re.compile(
-        r"def(?P<jinja>j?)\s+(?P<name>\$[a-z]+)\((?P<vars>(\s*\$[a-z]+\s*;)*(\s*\$[a-z]+\s*)?)\)\s*\{(?P<body>.*?)(?<!\\)}",
-        flags=re.MULTILINE | re.S,
-    )
-    found, text = find_and_remove(func_re, text)
-    res = {}
-    for k, v in found.items():
-        res[k] = {}
-        vars = [x.strip() for x in v["vars"].split(";") if x.strip()]
-        if len(vars) != len(set(vars)):
-            log.warning("Ignoring invalid function definition, duplicate vars: %s", vars)
-            continue
-        res[k]["vars"] = vars
-        res[k]["body"] = v["body"].strip()
-        res[k]["jinja"] = v["jinja"]
-    return res, text
-
-
-def function_calls(text):
-    call_re = re.compile(r"(?P<name>\$[a-z]+)\((?P<args>.*?)(?<!\\)\)")
-    res, text = find_and_remove(call_re, text, placeholder="FUNC")
-    for k, v in res.items():
-        args = [x.strip().replace(r"\;", ";") for x in re.split(r"(?<!\\);", v["args"])]
-        res[k]["args"] = args
-    return res, text
-
-
-def variable_definitions(text):
-    # name because find_and_remove expects t
-    var_re = re.compile(r"var\s+(?P<name>(\s*?\$[a-z]+\s*=[^;\n]*;?)+)")
-    defs, text = find_and_remove(var_re, text)
-    res = {}
-    for k, v in defs.items():
-        for d in (x for x in v["name"].strip().split(";") if x.strip()):
-            name, value = d.split("=", 1)
-            res[name.strip()] = value.strip()
-    return res, text
-
-
-def push_context(ctx):
-    for k in ctx.keys():
-        ctx[k] = ctx[k].new_child()
-
-
-def pop_context(ctx):
-    for k in ctx.keys():
-        ctx[k] = ctx[k].parents
-
-
-def parent_context(ctx):
-    new_ctx = {}
-    for k in ctx.keys():
-        new_ctx[k] = ctx[k].parents
-    return new_ctx
-
-
-class Nothing:
-    def __repr__(self):
-        return "Nothing"
-
-
-RECURSIVE_VARIABLE = Nothing()
-
-
-def read_preamble():
-    curfile = Path(__file__)
-    defaults = curfile.parent / "default_functions.txt"
-    with open(defaults, "r") as f:
-        defs = f.read()
-        _, defs = find_and_remove(re.compile("^#.*"), defs)
-        return defs
-
-
-def read_preamble_new(func):
-    curfile = Path(__file__)
-    defaults = curfile.parent / "default_functions2.txt"
-    with open(defaults, "r") as f:
-        return func(f.read())
-
-
-def init_context():
-    ctx = {"funcs": ChainMap(), "vars": ChainMap()}
-    curfile = Path(__file__)
-    defaults = curfile.parent / "default_functions.txt"
-    with open(defaults, "r") as f:
-        defs = f.read()
-        _, defs = find_and_remove(re.compile("^#.*"), defs)
-        funcs, _ = function_definitions(defs)
-        ctx["funcs"].update(funcs)
-    return ctx
-
-
-def variable_substitution(text, ctx=None, allow_definitions=True, jinja_render=False):
-    if ctx is None:
-        ctx = init_context()
-
-    funcs, text = function_definitions(text)
-    if allow_definitions:
-        ctx["funcs"].update(funcs)
-    vars, text = variable_definitions(text)
-    ctx["vars"].update(vars)
-    calls, text = function_calls(text)
-
-    regex = re.compile(r"(?P<name>\$[a-z]+)(?!\()\b")
-    vars, text = find_and_remove(regex, text, placeholder="VARIABLE")
-
-    for placeholder, var in vars.items():
-        value = ctx["vars"].get(var["name"])
-        name = var["name"]
-        if value is None:
-            raise ValueError(f"Undefined variable {name}")
-        if value is RECURSIVE_VARIABLE:
-            raise ValueError(f"Recursive variable in definition of {name}")
-        push_context(ctx)
-        ctx["vars"][name] = RECURSIVE_VARIABLE
-        value = variable_substitution(value, ctx, allow_definitions=False)
-        pop_context(ctx)
-        text = text.replace(placeholder, value)
-
-    for k, v in calls.items():
-        f = ctx["funcs"].get(v["name"])
-        if not f:
-            text = text.replace(k, "")
-            log.warning("Function %s not found, ignoring", v["name"])
-            continue
-        if len(v["args"]) != len(f["vars"]):
-            log.warning("Invalid function call to %s, ignoring", v["name"])
-            ex = "; ".join(f["vars"])
-            log.warning("Call syntax: %s(%s)", v["name"], ex)
-
-            continue
-
-        push_context(ctx)
-        for var, val in zip(f["vars"], v["args"]):
-            r = variable_substitution(val, parent_context(ctx))
-            r = r.replace("\(", "(").replace("\)", ")")
-            ctx["vars"][var] = r
-
-        j = f.get("jinja")
-        replacement = variable_substitution(f["body"], ctx, jinja_render=j)
-        text = text.replace(k, replacement)
-        pop_context(ctx)
-
-    if jinja_render:
-        t = render_jinja(text)
-        if t.strip() != text.strip():
-            text = t
-
-    return text.strip()
 
 
 class MUSimpleWildcard:
@@ -271,7 +123,8 @@ class MUSimpleWildcard:
         if use_pnginfo and unique_id in extra_pnginfo.get(CLASS_NAME, {}):
             text = extra_pnginfo[CLASS_NAME][unique_id]
             log.info("MUSimpleWildcard using prompt: %s", text)
-        newtext = variable_substitution(text)
+        ctx = read_preamble()
+        newtext = parse(text, ctx)
         if newtext != text:
             log.info("MUSimpleWildcard result:\n%s", newtext)
         return (newtext,)
@@ -285,5 +138,4 @@ except ImportError:
     print("Could not install wildcard prompt handler, node won't work")
 
 if __name__ == "__main__":
-    _, ctx = read_preamble_new(parse)
-    pparse("")
+    ctx = read_preamble()
