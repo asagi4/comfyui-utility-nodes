@@ -35,7 +35,7 @@ var.5: "$" "{" NAME "}" | "$" NAME
 NAME: /[a-z]+/
 argument_spec.10: "(" _WS? var? (_WS? _SEP _WS? var)* ")"
 argument_list.10: "(" _WS? expr? (_WS? _SEP expr _WS?)*")"
-function_body.20: "{" expr* "}"
+function_body.20: "{" (definition | expr)* "}"
 _SEP.1: ","
 _TERM.10: ";" | NEWLINE
 STRING.0: /[^"$(){},;\n]+/

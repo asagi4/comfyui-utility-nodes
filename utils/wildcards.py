@@ -124,7 +124,7 @@ class MUSimpleWildcard:
             text = extra_pnginfo[CLASS_NAME][unique_id]
             log.info("MUSimpleWildcard using prompt: %s", text)
         ctx = read_preamble()
-        newtext = parse(text, ctx)
+        newtext, _ = parse(text, ctx)
         if newtext != text:
             log.info("MUSimpleWildcard result:\n%s", newtext)
         return (newtext,)
