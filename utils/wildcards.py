@@ -4,6 +4,7 @@ import random
 import re
 from pathlib import Path
 import json
+import mmap
 
 from .parse import parse
 
@@ -22,7 +23,7 @@ def get_lora_tags(lora_name):
     found = None
     for f in filenames:
         if f.stem == lora_name:
-            found = f
+            found = folder_paths.get_full_path("loras", str(f))
             break
     if not found:
         return []
@@ -40,11 +41,12 @@ def get_lora_tags(lora_name):
 
 def load_lora_meta(filename):
     try:
-        with open(filename, "r", encoding="utf8") as m:
-            header = m.read(8)
-            n = int.from_bytes(header, "little")
-            metadata_bytes = m.read(n)
-            return json.loads(metadata_bytes).get("__metadata__", {})
+        with open(filename, "r", encoding="utf8") as f:
+            with mmap.mmap(f.fileno(), length=0, access=mmap.ACCESS_READ) as m:
+                header = m.read(8)
+                n = int.from_bytes(header, "little")
+                metadata_bytes = m.read(n)
+                return json.loads(metadata_bytes).get("__metadata__", {})
     except Exception as e:
         log.error("Metadata load failed for %s: %s", filename, e)
         return {}
@@ -53,7 +55,7 @@ def load_lora_meta(filename):
 def replace_lora_tags(text, seed):
     rand = random.Random(seed)
     func = re.compile(r"\bTAG<(?P<args>.*?)>")
-    text, matches = find_and_remove(func, text, placeholder="WILDCARDLORA")
+    matches, text = find_and_remove(func, text, placeholder="WILDCARDLORA")
     for placeholder, value in matches.items():
         args = value["args"].strip().split(",")
         replacement = []
@@ -70,12 +72,11 @@ def replace_lora_tags(text, seed):
                 replacement = tags
             elif mode == "r":
                 # rand
-                rand.sample(population=tags)
+                replacement = rand.sample(population=tags, k=count)
             else:
-                # top
                 replacement = tags[:count]
         except Exception as e:
-            print("Error:", e)
+            print("Error selecting tags:", e)
             pass
 
         r = ", ".join(replacement)
@@ -96,6 +97,8 @@ def handle_wildcard_node(json_data, node_id):
     n = json_data["prompt"][node_id]
     if not (n["inputs"].get("use_pnginfo") and node_id in wildcard_info):
         text = MUSimpleWildcard.select(n["inputs"]["text"], n["inputs"]["seed"])
+        ctx = read_preamble()
+        text, _ = parse(text, ctx)
         text = replace_lora_tags(text, n["inputs"]["seed"])
 
     if text.strip() != n["inputs"]["text"].strip():
@@ -194,11 +197,7 @@ class MUSimpleWildcard:
         if use_pnginfo and unique_id in extra_pnginfo.get(CLASS_NAME, {}):
             text = extra_pnginfo[CLASS_NAME][unique_id]
             log.info("MUSimpleWildcard using prompt: %s", text)
-        ctx = read_preamble()
-        newtext, _ = parse(text, ctx)
-        if newtext != text:
-            log.info("MUSimpleWildcard result:\n%s", newtext)
-        return (newtext,)
+        return (text,)
 
 
 try:
