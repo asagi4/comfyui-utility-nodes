@@ -3,8 +3,11 @@ from os import environ
 import random
 import re
 from pathlib import Path
+import json
 
 from .parse import parse
+
+import folder_paths
 
 # from .parse import parse
 
@@ -12,6 +15,73 @@ log = logging.getLogger("comfyui-misc-utils")
 log.setLevel(logging.INFO)
 
 CLASS_NAME = "MUSimpleWildcard"
+
+
+def get_lora_tags(lora_name):
+    filenames = [Path(f) for f in folder_paths.get_filename_list("loras")]
+    found = None
+    for f in filenames:
+        if f.stem == lora_name:
+            found = f
+            break
+    if not found:
+        return []
+    meta = load_lora_meta(found)
+    tags = json.loads(meta.get("ss_tag_frequency", "{}"))
+    alltags = []
+    tagcounts = {}
+    for k in tags:
+        for tag, count in tags[k].items():
+            t = tag.strip().replace("_", " ")
+            tagcounts[t] = tagcounts.get(t, 0) + count
+    alltags = [(v, k) for k, v in tagcounts.items()]
+    return sorted(alltags, reverse=True)
+
+
+def load_lora_meta(filename):
+    try:
+        with open(filename, "r", encoding="utf8") as m:
+            header = m.read(8)
+            n = int.from_bytes(header, "little")
+            metadata_bytes = m.read(n)
+            return json.loads(metadata_bytes).get("__metadata__", {})
+    except Exception as e:
+        log.error("Metadata load failed for %s: %s", filename, e)
+        return {}
+
+
+def replace_lora_tags(text, seed):
+    rand = random.Random(seed)
+    func = re.compile(r"\bTAG<(?P<args>.*?)>")
+    text, matches = find_and_remove(func, text, placeholder="WILDCARDLORA")
+    for placeholder, value in matches.items():
+        args = value["args"].strip().split(",")
+        replacement = []
+        count = 1
+        mode = "t"
+        try:
+            loraname = args[0]
+            if len(args) > 1:
+                count = int(args[1])
+            if len(args) > 2:
+                mode = args[2].strip()
+            tags = [t[1] for t in get_lora_tags(loraname)]
+            if len(tags) <= count:
+                replacement = tags
+            elif mode == "r":
+                # rand
+                rand.sample(population=tags)
+            else:
+                # top
+                replacement = tags[:count]
+        except Exception as e:
+            print("Error:", e)
+            pass
+
+        r = ", ".join(replacement)
+        text = text.replace(placeholder, r)
+
+    return text
 
 
 def wildcard_prompt_handler(json_data):
@@ -26,6 +96,7 @@ def handle_wildcard_node(json_data, node_id):
     n = json_data["prompt"][node_id]
     if not (n["inputs"].get("use_pnginfo") and node_id in wildcard_info):
         text = MUSimpleWildcard.select(n["inputs"]["text"], n["inputs"]["seed"])
+        text = replace_lora_tags(text, n["inputs"]["seed"])
 
     if text.strip() != n["inputs"]["text"].strip():
         json_data["prompt"][node_id]["inputs"]["use_pnginfo"] = True
