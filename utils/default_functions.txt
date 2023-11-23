@@ -1,16 +1,3 @@
-$if($p, $t, $f) = {
-  $('$t' if $p else '$f')
-}
-
-$comment($x) = {}
-
-$float($v) = { $(round($v, 2)) }
-
-$rec($exp, $v) = {
-  $x = $float($v)
-  $if($x <= 0,done,$exp $quote($rec($exp, $($x - 1))))
-}
-
 $descseq($expr, $var, $sw, $ew, $start, $step) = {
   [SEQ<%- for step in steps(0, $sw - $ew, $step) -%>
   <%- set $var = round($sw - step, 2) -%>
@@ -43,5 +30,4 @@ $coollora($lora, $start, $step) = {
 
 $rectmask($x, $y, $size) = {
 	MASK($x "<=" $x + $size "=>", $y "<=" $y + $size "=>")
-
 }
