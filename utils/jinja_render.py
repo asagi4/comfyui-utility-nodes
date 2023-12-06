@@ -73,7 +73,7 @@ class MUJinjaRender:
 
     RETURN_TYPES = ("STRING",)
 
-    CATEGORY = "promptcontrol/tools"
+    CATEGORY = "misc-utils"
     FUNCTION = "render"
 
     def render(self, text):

@@ -153,7 +153,7 @@ class MUSimpleWildcard:
 
     RETURN_TYPES = ("STRING",)
 
-    CATEGORY = "promptcontrol/tools"
+    CATEGORY = "misc-utils"
     FUNCTION = "doit"
 
     @classmethod
