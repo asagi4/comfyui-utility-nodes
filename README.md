@@ -16,11 +16,11 @@ Anything of the form `$name$` will look up `name.txt` in `$MU_WILDCARD_BASEDIR` 
 For example:
 ```
 $z = realistic, photo
-$foo($a, $b) = { $z, this is a $a that $b }
-$foo(car, drives)
+$foo($a, $b=idles) = { $z, this is a $a that $b }
+$foo(car)
 ```
 
-expands to `realistic, photo, this is a car that drives`
+expands to `realistic, photo, this is a car that idles`
 
 Variables can be defined inside functions and are local to the function
 

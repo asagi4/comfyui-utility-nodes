@@ -33,7 +33,8 @@ function_call.10: var argument_list | /\$/ argument_list
 
 var.5: "$" "{" NAME "}" | "$" NAME
 NAME: /[a-z]+/
-argument_spec.10: "(" _WS? var? (_WS? _SEP _WS? var)* ")"
+argument_spec.10: "(" _WS? argument? (_WS? _SEP _WS? argument)* ")"
+argument.10: var _WS? ["=" _WS? expr]
 argument_list.10: "(" _WS? expr? (_WS? _SEP expr _WS?)*")"
 function_body.20: "{" (definition | expr)* "}"
 _SEP.1: ","
@@ -131,11 +132,23 @@ class TestVisitor(Interpreter):
     @v_args(inline=True)
     def function_definition(self, var, argspec, function_body):
         var = varname(var)
-        args = [varname(a) for a in argspec.children]
+        args = self.visit_children(argspec)
+        found_defval = None
+        for x, defval in args:
+            if found_defval and not defval:
+                raise TypeError(f"Invalid function definition for {var}, must define default for {x}")
+            found_defval = defval
         with self.ctx as locals:
             res = (locals, args, function_body)
         self.ctx.set(var, res)
         return ""
+
+    @v_args(inline=True)
+    def argument(self, var, defval):
+        n = varname(var)
+        if defval:
+            defval = prompt(self.visit(defval)).strip()
+        return n, defval
 
     @v_args(inline=True)
     def argument_list(self, *args):
@@ -162,14 +175,23 @@ class TestVisitor(Interpreter):
             print_context_functions(self.ctx)
             raise TypeError(f"${var} is not a function")
         with self.ctx as c:
-            if len(params) != len(args):
+            required_params = []
+            for a, defval in params:
+                if defval is None:
+                    required_params.append(a)
+                else:
+                    break
+            if len(args) > len(params) or len(args) != len(required_params):
                 raise TypeError(f"Invalid number of arguments to function ${var}({','.join(f'${a}' for a in params)})")
+
+            # Fill in with defaults
+            args = args + [p[1] for p in params][len(args) :]
 
             for k, v in locals.vars.items():
                 c.set(k, v)
 
             for a, v in zip(params, args):
-                c.set(a, const(v))
+                c.set(a[0], const(v))
 
             return prompt(self.visit(function_body)).strip()
 
