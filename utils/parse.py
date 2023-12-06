@@ -181,7 +181,7 @@ class TestVisitor(Interpreter):
                     required_params.append(a)
                 else:
                     break
-            if len(args) > len(params) or len(args) != len(required_params):
+            if len(args) > len(params) or len(args) < len(required_params):
                 raise TypeError(f"Invalid number of arguments to function ${var}({','.join(f'${a}' for a in params)})")
 
             # Fill in with defaults
