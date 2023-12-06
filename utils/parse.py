@@ -44,10 +44,15 @@ STRING.0: /[^"$(){},;\n]+/
 from collections import ChainMap
 
 from .jinja_render import render_jinja
+from jinja2.exceptions import TemplateSyntaxError
 
 
 def eval(x):
-    return render_jinja(f"<={x}=>")
+    try:
+        return render_jinja(f"<={x}=>")
+    except TemplateSyntaxError as e:
+        log.error("MUSimpleWildcard Jinja eval failed: %s\n%s", e, x)
+        return ""
 
 
 MAGIC_FUNCTIONS = {"$": eval}

@@ -2,6 +2,8 @@ import logging
 import math
 import re
 from datetime import datetime
+from jinja2 import Environment
+from jinja2.exceptions import TemplateSyntaxError
 
 log = logging.getLogger("comfyui-misc-utils")
 
@@ -52,7 +54,6 @@ for fname in ["sqrt", "sin", "cos", "tan", "asin", "acos", "atan"]:
 
 
 def render_jinja(text):
-    from jinja2 import Environment
 
     jenv = Environment(
         block_start_string="<%",
@@ -77,7 +78,11 @@ class MUJinjaRender:
     FUNCTION = "render"
 
     def render(self, text):
-        t = render_jinja(text)
+        t = text
+        try:
+            t = render_jinja(text)
+        except TemplateSyntaxError as e:
+            log.error("MUJinjaRender failed to render template: %s\n%s", e, text)
         if t.strip() != text.strip():
             log.info("Jinja render result: %s", re.sub("\s+", " ", t, flags=re.MULTILINE))
         return (t,)
