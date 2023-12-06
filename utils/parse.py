@@ -122,7 +122,11 @@ class TestVisitor(Interpreter):
         self.ctx = ctx or Context()
 
     def __default__(self, tree):
-        return self.visit_children(tree)
+        try:
+            return self.visit_children(tree)
+        except TypeError as e:
+            log.error("Error: %s, ignoring", e)
+            return ""
 
     @v_args(inline=True)
     def function_definition(self, var, argspec, function_body):
@@ -131,10 +135,11 @@ class TestVisitor(Interpreter):
         with self.ctx as locals:
             res = (locals, args, function_body)
         self.ctx.set(var, res)
+        return ""
 
     @v_args(inline=True)
     def argument_list(self, *args):
-        return [prompt(self.visit_children(x)) for x in args]
+        return [prompt(self.visit_children(x)).strip() for x in args]
 
     @v_args(inline=True)
     def quoted(self, value):
@@ -194,6 +199,7 @@ class TestVisitor(Interpreter):
             resolve = const("")
 
         self.ctx.set(name, resolve)
+        return ""
 
     def start(self, tree):
         result = self.visit_children(tree)
@@ -203,10 +209,13 @@ class TestVisitor(Interpreter):
 
 def parse(x, ctx=None):
     try:
-        return TestVisitor(ctx).visit(raw_parse(x))
+        r = TestVisitor(ctx).visit(raw_parse(x))
+        if r is None:
+            return x, None
+        return r
     except Exception as e:
-        log.error("Error: %s", e)
-        raise
+        log.error("Parse error: %s", e)
+        return x, None
 
 
 def raw_parse(text, p="earley", **kwargs):
