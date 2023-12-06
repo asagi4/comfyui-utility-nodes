@@ -29,7 +29,7 @@ function_call.10: var argument_list | /\$/ argument_list
     | block
     | STRING
     | WS+ -> ws
-    | /[,;"]/
+    | /[,;]/
 
 var.5: "$" "{" NAME "}" | "$" NAME
 NAME: /[a-z]+/
@@ -110,10 +110,10 @@ def prompt(seq):
 
 
 def print_context_functions(ctx):
+    print("Functions available:")
     for v, val in ctx.vars.items():
-        print(val)
-        if isinstance(tuple, val):
-            print("function", v, val)
+        if isinstance(val, tuple):
+            print(f"- ${v}({','.join(val[1])})")
 
 
 class TestVisitor(Interpreter):
@@ -138,8 +138,9 @@ class TestVisitor(Interpreter):
 
     @v_args(inline=True)
     def quoted(self, value):
-        print("Quoted: '", value, "'")
         value = value.replace('\\"', '"')
+        if value == '""':
+            return '"'
         return value[1:][:-1]
 
     @v_args(inline=True)
@@ -153,8 +154,8 @@ class TestVisitor(Interpreter):
         try:
             locals, params, function_body = self.ctx.get(var)
         except TypeError:
-            raise TypeError(f"${var} is not a function")
             print_context_functions(self.ctx)
+            raise TypeError(f"${var} is not a function")
         with self.ctx as c:
             if len(params) != len(args):
                 raise TypeError(f"Invalid number of arguments to function ${var}({','.join(f'${a}' for a in params)})")

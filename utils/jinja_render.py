@@ -54,7 +54,6 @@ for fname in ["sqrt", "sin", "cos", "tan", "asin", "acos", "atan"]:
 
 
 def render_jinja(text):
-
     jenv = Environment(
         block_start_string="<%",
         block_end_string="%>",

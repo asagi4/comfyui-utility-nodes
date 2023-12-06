@@ -1,25 +1,27 @@
+$comment($anything) = {}
 $descseq($expr, $var, $sw, $ew, $start, $step) = {
   [SEQ<%- for step in steps(0, $sw - $ew, $step) -%>
-  <%- set $var = round($sw - step, 2) -%>
-  <%- if $var >= $ew -%>
+  <%- set $var "=" round($sw - step, 2) -%>
+  <%- if $var ">=" $ew -%>
   :$expr:<= round($start + step, 2) =>
   <%- endif -%>
   <%- endfor -%>
-  <%- set $var = $ew -%>:$expr:1]
+  <%- set $var "=" $ew -%>:$expr:1]
 }
 
 $ascseq($expr, $var, $sw, $ew, $start, $step) = {
   [SEQ<%- for step in steps(0, round($ew - $sw, 2), $step) -%>
-  <%- set $var = round($sw+step, 2) -%>
+  <%- set $var "=" round($sw+step, 2) -%>
   <%- if $var < $ew -%>
   :$expr:<= round($start + step, 2) =>
   <%- endif -%>
   <%- endfor -%>
-  <%- set $var = $ew -%>:$expr:1]
+  <%- set $var "=" $ew -%>:$expr:1]
 }
 
 $warmlora($lora, $e, $start, $step) = {
-    $x = <lora:$lora:<= x + $start =>>; $y = $($e - $start)
+    $x = <lora:$lora:<= x + $start "=>>"
+	$y = $($e - $start)
 	$ascseq($x, x, 0, $y, $step, $step)
 }
 

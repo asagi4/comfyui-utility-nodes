@@ -19,13 +19,16 @@ $z = realistic, photo
 $foo($a, $b) = { $z, this is a $a that $b }
 $foo(car, drives)
 ```
+
 expands to `realistic, photo, this is a car that drives`
 
 Variables can be defined inside functions and are local to the function
 
 You can define multiple variables per line by separating them with `;`
 
-`""` can be used to quote something when it would conflict with syntax, for example: `$func("parameter, with comma", second parameter)`
+Note that variables and functions can be defined *anywhere* in the prompt, meaning that `a $foo = bar` will define `$foo` and expand into just `a `. This might cause weird behaviour if you want to do complicated things with `MUJinjaRender`.
+
+`"text"` can be used to quote something when it would conflict with syntax, for example: `$func("parameter, with comma", second parameter)`. If you need a " by itself, use "".
 
 ## MUJinjaRender
 You can use this node to evaluate a string as a Jinja2 template. Note, however, that because ComfyUI's frontend uses `{}` for syntax, There are the following modifications to Jinja syntax:
