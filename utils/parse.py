@@ -117,6 +117,8 @@ def showarg(a):
 
 def print_context_functions(ctx):
     log.info("Functions available:")
+    log.info("- $help(), shows this help")
+    log.info("- $($expr), evaluates $expr as jinja")
     for v, val in ctx.vars.items():
         if isinstance(val, tuple):
             log.info(f"- ${v}({','.join(showarg(a) for a in val[1])})")

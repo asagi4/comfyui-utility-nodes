@@ -8,7 +8,6 @@ import mmap
 
 from .parse import parse
 
-import folder_paths
 
 # from .parse import parse
 
@@ -202,6 +201,7 @@ class MUSimpleWildcard:
 
 try:
     from server import PromptServer
+    import folder_paths
 
     PromptServer.instance.add_on_prompt_handler(wildcard_prompt_handler)
 except ImportError:
