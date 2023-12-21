@@ -84,6 +84,9 @@ def replace_lora_tags(text, seed):
     return text
 
 
+global_ctx = None
+
+
 def wildcard_prompt_handler(json_data):
     for node_id in json_data["prompt"].keys():
         if json_data["prompt"][node_id]["class_type"] == CLASS_NAME:
@@ -92,12 +95,14 @@ def wildcard_prompt_handler(json_data):
 
 
 def handle_wildcard_node(json_data, node_id):
+    global global_ctx
     wildcard_info = json_data.get("extra_data", {}).get("extra_pnginfo", {}).get(CLASS_NAME, {})
     n = json_data["prompt"][node_id]
     if not (n["inputs"].get("use_pnginfo") and node_id in wildcard_info):
         text = MUSimpleWildcard.select(n["inputs"]["text"], n["inputs"]["seed"])
-        ctx = read_preamble()
-        text, _ = parse(text, ctx)
+        if not global_ctx or "$debugwc" in text:
+            global_ctx = read_preamble()
+        text, _ = parse(text, global_ctx)
         text = replace_lora_tags(text, n["inputs"]["seed"])
 
     if text.strip() != n["inputs"]["text"].strip():
@@ -111,6 +116,7 @@ def read_preamble():
     curfile = Path(__file__)
     defaults = curfile.parent / "default_functions.txt"
     with open(defaults, "r") as f:
+        log.info("Reading functions from %s", defaults)
         return parse(f.read())[1]
 
 
@@ -208,4 +214,6 @@ except ImportError:
     print("Could not install wildcard prompt handler, node won't work")
 
 if __name__ == "__main__":
+    print("Start parse")
     ctx = read_preamble()
+    print("End parse")

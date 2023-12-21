@@ -65,8 +65,6 @@ def const(x):
 
 
 class Context:
-    POISON = object()
-
     def __init__(self):
         self.vars = ChainMap()
 
@@ -83,9 +81,6 @@ class Context:
 
     def get(self, name, default=None):
         return self.vars.get(str(name), default)
-
-    def poison(self, name):
-        self.vars[str(name)] = self.POISON
 
 
 def varname(x):
@@ -116,15 +111,22 @@ def showarg(a):
 
 
 def print_context_functions(ctx):
-    log.info("Functions available:")
-    log.info("- $help(), shows this help")
-    log.info("- $($expr), evaluates $expr as jinja")
+    def p(x):
+        print("MUWildcard help:", x)
+
+    p("Functions available:")
+    p("- $help(), shows this help")
+    p("- $($expr), evaluates $expr as jinja")
     for v, val in ctx.vars.items():
-        if isinstance(val, tuple):
-            log.info(f"- ${v}({','.join(showarg(a) for a in val[1])})")
+        if isinstance(val, tuple) and "hidden" not in [a[0] for a in val[1]]:
+            p(f"- ${v}({','.join(showarg(a) for a in val[1])})")
 
 
-MAGIC_FUNCTIONS = {"$": eval, "help": print_context_functions}
+def debug(ctx, x):
+    print("MUWildCard Debug:", x)
+
+
+MAGIC_FUNCTIONS = {"$": eval, "help": print_context_functions, "debug": debug}
 
 
 class TestVisitor(Interpreter):
@@ -140,10 +142,17 @@ class TestVisitor(Interpreter):
         var = varname(var)
         args = self.visit_children(argspec)
         found_defval = None
-        for x, defval in args:
-            if found_defval and not defval:
-                raise TypeError(f"Invalid function definition for {var}, must define default for {x}")
-            found_defval = defval
+        args = []
+        with self.ctx as c:
+            for arg in argspec.children:
+                x, defval = self.visit(arg)
+                if found_defval and not defval:
+                    raise TypeError(f"Invalid function definition for {var}, must define default for {x}")
+                found_defval = defval
+                args.append((x, defval))
+                # Allow $fn($a=1, $b=$a)
+                if x not in c.vars:
+                    c.set(x, defval)
         with self.ctx as locals:
             res = (locals, args, function_body)
         self.ctx.set(var, res)
@@ -257,9 +266,12 @@ class TestVisitor(Interpreter):
         return final_prompt, self.ctx
 
 
+parser = lark.Lark(definition, parser="earley")
+
+
 def parse(x, ctx=None):
     try:
-        r = TestVisitor(ctx).visit(raw_parse(x))
+        r = TestVisitor(ctx).visit(parser.parse(x))
         if r is None:
             return x, None
         return r
@@ -268,10 +280,10 @@ def parse(x, ctx=None):
         return x, None
 
 
-def raw_parse(text, p="earley", **kwargs):
-    x = lark.Lark(definition, parser=p, debug=True, **kwargs)
+def debug_parse(text, p="earley", **kwargs):
+    x = lark.Lark(definition, parser=p, debug=True)
     return x.parse(text)
 
 
 def pparse(text, p="earley", **kwargs):
-    print(raw_parse(text, p, **kwargs).pretty())
+    print(debug_parse(text, p, **kwargs).pretty())
