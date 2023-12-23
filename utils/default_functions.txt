@@ -1,6 +1,9 @@
 $comment($doc="Ignores its parameters") = {}
+
 $debugwc=
+
 $valueof($x, $doc="Does nothing, but documents the default value of a function parameter") = { "$valueof("$x")" }
+
 $default($expr, $defval, $doc="returns $defval if $expr is $valueof(something)") = {
 	$('$defval' if '$expr'.startswith("'$valueof'") else '$expr')
 }
@@ -43,4 +46,8 @@ $coollora($lora, $start=1.0, $end=0.0, $step=0.1, $startat=0, $decrement=$valueo
 
 $rectmask($x, $y, $size) = {
 	MASK($x "<=" $x + $size "=>", $y "<=" $y + $size "=>")
+}
+
+$weight($expr, $stepspec, $inw, $outw=1, $doc="shortcut for [($expr:$inw):($expr:$outw):$stepspec]") = {
+  [($expr:$inw):($expr:$outw):$stepspec]
 }
