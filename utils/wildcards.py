@@ -113,11 +113,21 @@ def handle_wildcard_node(json_data, node_id):
 
 
 def read_preamble():
-    curfile = Path(__file__)
-    defaults = curfile.parent / "default_functions.txt"
-    with open(defaults, "r") as f:
-        log.info("Reading functions from %s", defaults)
-        return parse(f.read())[1]
+    includes = environ.get("MU_WILDCARD_INCLUDE", "defaults")
+    includes = [x.strip() for x in includes.split(";") if x.strip()]
+    ctx = None
+    for x in includes:
+        file = Path(x)
+        if x == "defaults":
+            curfile = Path(__file__)
+            file = curfile.parent / "default_functions.txt"
+        try:
+            with open(file, "r") as f:
+                log.info("Reading functions from %s", file)
+                ctx = parse(f.read(), ctx=ctx)[1]
+        except Exception as e:
+            log.error("Error reading definitions from %s: %s. Ignoring...", file, e)
+    return ctx
 
 
 def find_and_remove(regexp, text, placeholder=""):
