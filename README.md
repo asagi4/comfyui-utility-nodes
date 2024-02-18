@@ -8,9 +8,15 @@ A collection of miscellaneous nodes for ComfyUI
 
 Expands wildcards, variables and functions (macros).
 
+It does more than its name implies.
+
 ### Wildcards
 
 Anything of the form `$name$` will look up `name.txt` in the directory specified by the environment variable `MU_WILDCARD_BASEDIR` (defaults to `wildcards` under the current working directory if unset) and randomly chooses one line from it as a replacement.
+
+You can use `$name:filter:filter2:...$` to add filters to the wildcard. All of them must match (the matching is case-sensitive). if the filter starts with `!`, the term must *not* match
+
+You can also use `$name+n$` where `n` is a number to add an offset to the seed used.
 
 ### Functions and variables
 For example:
@@ -31,6 +37,10 @@ Note that variables and functions can be defined *anywhere* in the prompt, meani
 Variables are **not** captured by function definitions. If you define a variable `$z`, then define `$f() { a $z }`, and then redefine `$z`, any calls to`$f` will use the *redefined* value.
 
 `"text"` can be used to quote something when it would conflict with syntax, for example: `$func("parameter, with comma", second parameter)`. If you need a `"` by itself, use `""`.
+
+#### Default variables
+
+The variable `$seed` is available and is the seed given to the `MUWildcard` node.
 
 #### Default functions
 There are some default functions available. put `$help()` in your prompt to see a list of available functions.

@@ -98,12 +98,14 @@ def handle_wildcard_node(json_data, node_id):
     global global_ctx
     wildcard_info = json_data.get("extra_data", {}).get("extra_pnginfo", {}).get(CLASS_NAME, {})
     n = json_data["prompt"][node_id]
+    seed = n["inputs"]["seed"]
     if not (n["inputs"].get("use_pnginfo") and node_id in wildcard_info):
-        text = MUSimpleWildcard.select(n["inputs"]["text"], n["inputs"]["seed"])
+        text = MUSimpleWildcard.select(n["inputs"]["text"], seed)
         if not global_ctx or "$debugwc" in text:
             global_ctx = read_preamble()
+        global_ctx.set("seed", lambda: str(seed))
         text, _ = parse(text, global_ctx)
-        text = replace_lora_tags(text, n["inputs"]["seed"])
+        text = replace_lora_tags(text, seed)
 
     if text.strip() != n["inputs"]["text"].strip():
         json_data["prompt"][node_id]["inputs"]["use_pnginfo"] = True
@@ -174,11 +176,22 @@ class MUSimpleWildcard:
     @classmethod
     def read_wildcards(cls, name):
         path = environ.get("MU_WILDCARD_BASEDIR", "wildcards")
+        r = name.split(":")
+        name = r[0]
+        filters = r[1:]
+
+        def matches(x):
+            for f in filters:
+                if f.startswith("!") and f[1:] in x:
+                    return False
+                elif not f.startswith("!") and f not in x:
+                    return False
+            return True
 
         f = (Path(path) / Path(name)).with_suffix(".txt")
         try:
             with open(f, "r") as file:
-                return [l.strip() for l in file.readlines() if l.strip()]
+                return [l.strip() for l in file.readlines() if l.strip() and matches(l)]
         except:
             log.warning("Wildcard file not found for %s", name)
             return [name]
@@ -186,23 +199,26 @@ class MUSimpleWildcard:
     @classmethod
     def select(cls, text, seed):
         cls.RAND.seed(seed)
-        wildcard_re = re.compile(r"\$(?P<name>[A-Za-z0-9_/.-]+)(\+(?P<offset>[0-9]+))?\$")
+        wildcard_re = re.compile(r"\$(?P<name>[A-Za-z0-9_/.!:-]+)(\+(?P<offset>[0-9]+))?\$")
         matches, text = find_and_remove(wildcard_re, text, placeholder="MU_WILDCARD")
         for placeholder, value in matches.items():
             state = None
             ws = cls.read_wildcards(value["name"])
             offset = int(value["offset"] or 0)
-            if offset:
+            if ws and offset:
                 # advance the state once and store it so that the next non-offset result stays deterministic
                 w = cls.RAND.choice(ws)
                 state = cls.RAND.getstate()
                 # advance the state until offset,
                 for _ in range(offset):
                     w = cls.RAND.choice(ws)
-            else:
+            elif ws:
                 w = cls.RAND.choice(ws)
+            else:
+                log.warning("No wildcards found for %s", value["name"])
+                w = ""
             text = text.replace(placeholder, w)
-            log.info("Selected wildcard %s for %s", w, value["name"])
+            log.info("Replaced wildcard %s with '%s'", value["name"], w)
             if state:
                 cls.RAND.setstate(state)
 
