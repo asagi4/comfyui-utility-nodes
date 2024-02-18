@@ -16,7 +16,9 @@ Anything of the form `$name$` will look up `name.txt` in the directory specified
 
 You can use `$name:filter:filter2:...$` to add filters to the wildcard. All of them must match (the matching is case-sensitive). if the filter starts with `!`, the term must *not* match
 
-You can also use `$name+n$` where `n` is a number to add an offset to the seed used.
+You can also use `$name+n$` where `n` is a number to add an offset to the seed used. If you have filters, put it at the end: `$name:filter:!filter2+n$`
+
+There's a magic wildcard, `$LORA$` (case-sensitive) that will return all LoRAs known to ComfyUI. It can be filtered like any other wildcard.
 
 ### Functions and variables
 For example:

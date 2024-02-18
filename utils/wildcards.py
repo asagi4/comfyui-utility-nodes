@@ -8,7 +8,6 @@ import mmap
 
 from .parse import parse
 
-
 # from .parse import parse
 
 log = logging.getLogger("comfyui-misc-utils")
@@ -187,6 +186,9 @@ class MUSimpleWildcard:
                 elif not f.startswith("!") and f not in x:
                     return False
             return True
+
+        if name == "LORA":
+            return [l for l in folder_paths.get_filename_list("loras") if matches(l)]
 
         f = (Path(path) / Path(name)).with_suffix(".txt")
         try:
