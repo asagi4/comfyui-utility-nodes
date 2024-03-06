@@ -14,6 +14,8 @@ It does more than its name implies.
 
 Anything of the form `$name$` will look up `name.txt` in the directory specified by the environment variable `MU_WILDCARD_BASEDIR` (defaults to `wildcards` under the current working directory if unset) and randomly chooses one line from it as a replacement.
 
+Wildcards are evaluated *before* variable and macro expansion, unless you use the form `$?name$`, which will delay wildcard selection until all variables have been expanded.
+
 You can use `$name:filter:filter2:...$` to add filters to the wildcard. All of them must match (the matching is case-sensitive). if the filter starts with `!`, the term must *not* match
 
 You can also use `$name+n$` where `n` is a number to add an offset to the seed used. If you have filters, put it at the end: `$name:filter:!filter2+n$`

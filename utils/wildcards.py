@@ -99,11 +99,13 @@ def handle_wildcard_node(json_data, node_id):
     n = json_data["prompt"][node_id]
     seed = n["inputs"]["seed"]
     if not (n["inputs"].get("use_pnginfo") and node_id in wildcard_info):
-        text = MUSimpleWildcard.select(n["inputs"]["text"], seed)
+        RAND.seed(seed)
+        text, delayed = replace_wildcards(n["inputs"]["text"])
         if not global_ctx or "$debugwc" in text:
             global_ctx = read_preamble()
         global_ctx.set("seed", lambda: str(seed))
         text, _ = parse(text, global_ctx)
+        text = replace_wildcards(text, delayed)
         text = replace_lora_tags(text, seed)
 
     if text.strip() != n["inputs"]["text"].strip():
@@ -150,9 +152,76 @@ def find_and_remove(regexp, text, placeholder=""):
     return res, text
 
 
-class MUSimpleWildcard:
-    RAND = random.Random()
+RAND = random.Random()
 
+
+def read_wildcards(name):
+    path = environ.get("MU_WILDCARD_BASEDIR", "wildcards")
+    r = name.split(":")
+    name = r[0]
+    filters = r[1:]
+
+    def matches(x):
+        for f in filters:
+            if f.startswith("!") and f[1:] in x:
+                return False
+            elif not f.startswith("!") and f not in x:
+                return False
+        return True
+
+    if name == "LORA":
+        return [l for l in folder_paths.get_filename_list("loras") if matches(l)]
+
+    f = (Path(path) / Path(name)).with_suffix(".txt")
+    try:
+        with open(f, "r") as file:
+            return [l.strip() for l in file.readlines() if l.strip() and matches(l)]
+    except:
+        log.warning("Wildcard file not found for %s", name)
+        return [name]
+
+
+def replace_wildcards(text, delayed_matches=None):
+    if delayed_matches is not None:
+        # replace delayed match placeholders with names again to properly select them
+        for ph, v in delayed_matches.items():
+            offset = v["offset"] or 0
+            name = v["name"]
+            text = text.replace(ph, f"${name}+{offset}$")
+    wildcard_re = re.compile(r"\$(?P<name>[A-Za-z0-9_/.!:?-]+)(\+(?P<offset>[0-9]+))?\$")
+    matches, text = find_and_remove(wildcard_re, text, placeholder="MU_WILDCARD")
+    delayed = {}
+    for placeholder, value in matches.items():
+        state = None
+        name = value["name"]
+        if name.startswith("?") and delayed_matches is None:
+            # Handle wildcard after macro expansion
+            value["name"] = name[1:]
+            delayed[placeholder] = value
+            continue
+        ws = read_wildcards(name)
+        offset = int(value["offset"] or 0)
+        if ws and offset:
+            # advance the state once and store it so that the next non-offset result stays deterministic
+            w = RAND.choice(ws)
+            state = RAND.getstate()
+            # advance the state until offset,
+            for _ in range(offset):
+                w = RAND.choice(ws)
+        elif ws:
+            w = RAND.choice(ws)
+        else:
+            log.warning("No wildcards found for %s", value["name"])
+            w = ""
+        text = text.replace(placeholder, w)
+        log.info("Replaced wildcard %s with '%s'", value["name"], w)
+        if state:
+            RAND.setstate(state)
+
+    return text.strip(), delayed
+
+
+class MUSimpleWildcard:
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -171,60 +240,6 @@ class MUSimpleWildcard:
 
     CATEGORY = "misc-utils"
     FUNCTION = "doit"
-
-    @classmethod
-    def read_wildcards(cls, name):
-        path = environ.get("MU_WILDCARD_BASEDIR", "wildcards")
-        r = name.split(":")
-        name = r[0]
-        filters = r[1:]
-
-        def matches(x):
-            for f in filters:
-                if f.startswith("!") and f[1:] in x:
-                    return False
-                elif not f.startswith("!") and f not in x:
-                    return False
-            return True
-
-        if name == "LORA":
-            return [l for l in folder_paths.get_filename_list("loras") if matches(l)]
-
-        f = (Path(path) / Path(name)).with_suffix(".txt")
-        try:
-            with open(f, "r") as file:
-                return [l.strip() for l in file.readlines() if l.strip() and matches(l)]
-        except:
-            log.warning("Wildcard file not found for %s", name)
-            return [name]
-
-    @classmethod
-    def select(cls, text, seed):
-        cls.RAND.seed(seed)
-        wildcard_re = re.compile(r"\$(?P<name>[A-Za-z0-9_/.!:-]+)(\+(?P<offset>[0-9]+))?\$")
-        matches, text = find_and_remove(wildcard_re, text, placeholder="MU_WILDCARD")
-        for placeholder, value in matches.items():
-            state = None
-            ws = cls.read_wildcards(value["name"])
-            offset = int(value["offset"] or 0)
-            if ws and offset:
-                # advance the state once and store it so that the next non-offset result stays deterministic
-                w = cls.RAND.choice(ws)
-                state = cls.RAND.getstate()
-                # advance the state until offset,
-                for _ in range(offset):
-                    w = cls.RAND.choice(ws)
-            elif ws:
-                w = cls.RAND.choice(ws)
-            else:
-                log.warning("No wildcards found for %s", value["name"])
-                w = ""
-            text = text.replace(placeholder, w)
-            log.info("Replaced wildcard %s with '%s'", value["name"], w)
-            if state:
-                cls.RAND.setstate(state)
-
-        return text.strip()
 
     def doit(self, text, seed, extra_pnginfo, unique_id, use_pnginfo=False):
         if use_pnginfo and unique_id in extra_pnginfo.get(CLASS_NAME, {}):
