@@ -29,7 +29,7 @@ function_call.10: var argument_list | /\$/ argument_list
     | block
     | STRING
     | WS+ -> ws
-    | /[,;]/
+    | SINGLES
 
 var.5: "$" "{" NAME "}" | "$" NAME
 NAME: /[a-z]+/
@@ -41,6 +41,7 @@ function_body.20: "{" (definition | expr)* "}"
 _SEP.1: ","
 _TERM.10: ";" | NEWLINE
 STRING.0: /[^"$(){},;\n]+/
+SINGLES.-10: /[,;]/
 """
 
 from collections import ChainMap
