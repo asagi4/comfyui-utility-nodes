@@ -105,7 +105,7 @@ def handle_wildcard_node(json_data, node_id):
             global_ctx = read_preamble()
         global_ctx.set("seed", lambda: str(seed))
         text, _ = parse(text, global_ctx)
-        text = replace_wildcards(text, delayed)
+        text, _ = replace_wildcards(text, delayed)
         text = replace_lora_tags(text, seed)
 
     if text.strip() != n["inputs"]["text"].strip():
