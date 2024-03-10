@@ -82,3 +82,11 @@ The `steps` function will generate a list of steps for iterating.
 
 You can call it either as `steps(end)`, `steps(end, step=0.1)` or `steps(start, end, step)`. `step` is an optional parameter that defaults to `0.1`. It'll return steps *inclusive* of start and end as long as step doesn't go past the end. 
 The second form is equivalent to `steps(step, end, step)`. i.e. it starts at the first step.
+
+## MUReplaceModelWeights
+
+This node replaces model weights *in-place*. It can be applied after for example Stable-Fast Unet compilation to change a model's weights without triggering a recompilation while still keeping the speed benefits from a compiled model.
+
+To use it, load a checkpoint as usual, apply Stable-Fast to the model, and then "reapply" weights with this node afterwards.
+
+It is 100% a hack, but it works and will save time if you change models often. The node will not work if you attempt to change the model type (that is, don't try to load SD1.5 weights into an SDXL model).
