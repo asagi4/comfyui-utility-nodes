@@ -1,0 +1,15 @@
+[project]
+name = "comfyui-utility-nodes"
+description = "Miscellaneous utility nodes, including wilcards, macros and variables"
+version = "1.0.0"
+license = "LICENSE"
+dependencies = ["lark", "jinja2"]
+
+[project.urls]
+Repository = "https://github.com/asagi4/comfyui-utility-nodes"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = "asagi4"
+DisplayName = "ComfyUI utility nodes"
+Icon = ""
