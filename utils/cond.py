@@ -45,7 +45,6 @@ class MUConditioningCutoff:
 
     def apply(self, conds, start_cutoff, end_cutoff):
         res = []
-        new_start = 0.0
         for c in conds:
             start = c[1].get("start_percent", 0.0)
             end = c[1].get("end_percent", 1.0)
@@ -57,10 +56,11 @@ class MUConditioningCutoff:
                 continue
             if end >= end_cutoff:
                 end = 1.0
+            if start <= start_cutoff:
+                start = 0.0
             c = [c[0].clone(), c[1].copy()]
-            c[1]["start_percent"] = new_start
+            c[1]["start_percent"] = start
             c[1]["end_percent"] = end
-            new_start = end
             res.append(c)
 
         if len(res) == 0:
