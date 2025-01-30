@@ -65,6 +65,10 @@ class MUConditioningCutoff:
 
         if len(res) == 0:
             log.warn("Cutoff would filter all conds, using the last one")
-            res = conds[-1]
+            c = conds[-1]
+            c = [c[0], c[1].copy()]
+            c[1]["start_percent"] = 0.0
+            c[1]["end_percent"] = 1.0
+            res.append(c)
 
         return (res,)
